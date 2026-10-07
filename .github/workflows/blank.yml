@@ -1,9 +1,104 @@
-windows11-vm/
-├── README.md
-├── LICENSE
-├── .gitignore
-├── config.ps1
-├── create-vm.ps1
-├── start-vm.ps1
-├── stop-vm.ps1
-└── remove-vm.ps1
+# Windows 11 VM - Hyper-V
+# 4 CPU | 8 GB RAM | 100 GB HDD
+
+$VMName = "Windows11-VM"
+$VMPath = "C:\VM\$VMName"
+$VHDPath = "$VMPath\$VMName.vhdx"
+$ISOPath = "C:\ISO\Windows11.iso"
+
+$RAM = 8GB
+$CPU = 4
+$DiskSize = 100GB
+
+# Verificar administrador
+$admin = ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator
+)
+
+if (-not $admin) {
+    Write-Host "ERRO: execute o PowerShell como Administrador." -ForegroundColor Red
+    exit 1
+}
+
+# Verificar Hyper-V
+$hyperv = Get-WindowsOptionalFeature `
+    -Online `
+    -FeatureName Microsoft-Hyper-V-All
+
+if ($hyperv.State -ne "Enabled") {
+    Write-Host "ERRO: Hyper-V não está habilitado." -ForegroundColor Red
+    Write-Host "Execute:"
+    Write-Host "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All"
+    exit 1
+}
+
+# Verificar ISO
+if (-not (Test-Path $ISOPath)) {
+    Write-Host "ERRO: ISO não encontrada:" -ForegroundColor Red
+    Write-Host $ISOPath
+    exit 1
+}
+
+# Verificar se a VM já existe
+if (Get-VM -Name $VMName -ErrorAction SilentlyContinue) {
+    Write-Host "ERRO: a VM '$VMName' já existe." -ForegroundColor Red
+    exit 1
+}
+
+# Criar pasta
+New-Item `
+    -ItemType Directory `
+    -Path $VMPath `
+    -Force | Out-Null
+
+# Criar disco virtual
+Write-Host "Criando disco de 100 GB..."
+
+New-VHD `
+    -Path $VHDPath `
+    -SizeBytes $DiskSize `
+    -Dynamic | Out-Null
+
+# Criar VM Generation 2
+Write-Host "Criando máquina virtual..."
+
+New-VM `
+    -Name $VMName `
+    -Generation 2 `
+    -MemoryStartupBytes $RAM `
+    -Path $VMPath `
+    -VHDPath $VHDPath | Out-Null
+
+# Configurar CPU
+Set-VMProcessor `
+    -VMName $VMName `
+    -Count $CPU
+
+# Desativar memória dinâmica
+Set-VMMemory `
+    -VMName $VMName `
+    -DynamicMemoryEnabled $false
+
+# Secure Boot
+Set-VMFirmware `
+    -VMName $VMName `
+    -EnableSecureBoot On `
+    -SecureBootTemplate "MicrosoftWindows"
+
+# Adicionar ISO
+Add-VMDvdDrive `
+    -VMName $VMName `
+    -Path $ISOPath
+
+# Obter DVD
+$DVD = Get-VMDvdDrive `
+    -VMName $VMName
+
+# Definir DVD como primeiro boot
+Set-VMFirmware `
+    -VMName $VMName `
+    -FirstBootDevice $DVD
+
+# Cri
