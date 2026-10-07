@@ -1,60 +1,9 @@
-# ============================================
-# VM WINDOWS 11 - HYPER-V
-# 4 CPUs | 8 GB RAM | 100 GB | TPM 2.0
-# ============================================
-
-$VMName = "Windows11-VM"
-$VMPath = "C:\VMs\$VMName"
-$VHDPath = "$VMPath\$VMName.vhdx"
-$ISOPath = "C:\ISO\Windows11.iso"
-
-$MemoryStartup = 8GB
-$MemoryMinimum = 4GB
-$MemoryMaximum = 10GB
-$ProcessorCount = 4
-$DiskSize = 100GB
-
-# Verifica administrador
-$principal = New-Object Security.Principal.WindowsPrincipal(
-    [Security.Principal.WindowsIdentity]::GetCurrent()
-)
-
-if (-not $principal.IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator
-)) {
-    Write-Host "Execute este script como Administrador." -ForegroundColor Red
-    exit
-}
-
-# Verifica Hyper-V
-if (-not (Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All).State -eq "Enabled") {
-    Write-Host "Hyper-V não está habilitado." -ForegroundColor Yellow
-    Write-Host "Habilitando Hyper-V..."
-
-    Enable-WindowsOptionalFeature `
-        -Online `
-        -FeatureName Microsoft-Hyper-V `
-        -All `
-        -NoRestart
-
-    Write-Host "Reinicie o computador e execute o script novamente."
-    exit
-}
-
-# Verifica ISO
-if (-not (Test-Path $ISOPath)) {
-    Write-Host "ISO não encontrada:" -ForegroundColor Red
-    Write-Host $ISOPath
-    exit
-}
-
-# Cria diretório
-New-Item -ItemType Directory -Force -Path $VMPath | Out-Null
-
-# Remove VM antiga, se existir
-$ExistingVM = Get-VM -Name $VMName -ErrorAction SilentlyContinue
-
-if ($ExistingVM) {
-    Write-Host "VM existente encontrada." -ForegroundColor Yellow
-
-   
+windows11-vm/
+├── README.md
+├── LICENSE
+├── .gitignore
+├── config.ps1
+├── create-vm.ps1
+├── start-vm.ps1
+├── stop-vm.ps1
+└── remove-vm.ps1
