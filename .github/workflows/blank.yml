@@ -1,104 +1,27 @@
-# Windows 11 VM - Hyper-V
-# 4 CPU | 8 GB RAM | 100 GB HDD
+services:
+  windows:
+    image: dockurr/windows:latest
+    container_name: pc-virtual
+    restart: unless-stopped
 
-$VMName = "Windows11-VM"
-$VMPath = "C:\VM\$VMName"
-$VHDPath = "$VMPath\$VMName.vhdx"
-$ISOPath = "C:\ISO\Windows11.iso"
+    environment:
+      VERSION: "11"
+      RAM_SIZE: "16G"
+      CPU_CORES: "4"
+      DISK_SIZE: "100G"
+      USERNAME: "PC"
+      PASSWORD: "TroqueEstaSenha123!"
 
-$RAM = 8GB
-$CPU = 4
-$DiskSize = 100GB
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
 
-# Verificar administrador
-$admin = ([Security.Principal.WindowsPrincipal] `
-    [Security.Principal.WindowsIdentity]::GetCurrent()
-).IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator
-)
+    cap_add:
+      - NET_ADMIN
 
-if (-not $admin) {
-    Write-Host "ERRO: execute o PowerShell como Administrador." -ForegroundColor Red
-    exit 1
-}
+    ports:
+      - "8006:8006"
+      - "3389:3389"
 
-# Verificar Hyper-V
-$hyperv = Get-WindowsOptionalFeature `
-    -Online `
-    -FeatureName Microsoft-Hyper-V-All
-
-if ($hyperv.State -ne "Enabled") {
-    Write-Host "ERRO: Hyper-V não está habilitado." -ForegroundColor Red
-    Write-Host "Execute:"
-    Write-Host "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All"
-    exit 1
-}
-
-# Verificar ISO
-if (-not (Test-Path $ISOPath)) {
-    Write-Host "ERRO: ISO não encontrada:" -ForegroundColor Red
-    Write-Host $ISOPath
-    exit 1
-}
-
-# Verificar se a VM já existe
-if (Get-VM -Name $VMName -ErrorAction SilentlyContinue) {
-    Write-Host "ERRO: a VM '$VMName' já existe." -ForegroundColor Red
-    exit 1
-}
-
-# Criar pasta
-New-Item `
-    -ItemType Directory `
-    -Path $VMPath `
-    -Force | Out-Null
-
-# Criar disco virtual
-Write-Host "Criando disco de 100 GB..."
-
-New-VHD `
-    -Path $VHDPath `
-    -SizeBytes $DiskSize `
-    -Dynamic | Out-Null
-
-# Criar VM Generation 2
-Write-Host "Criando máquina virtual..."
-
-New-VM `
-    -Name $VMName `
-    -Generation 2 `
-    -MemoryStartupBytes $RAM `
-    -Path $VMPath `
-    -VHDPath $VHDPath | Out-Null
-
-# Configurar CPU
-Set-VMProcessor `
-    -VMName $VMName `
-    -Count $CPU
-
-# Desativar memória dinâmica
-Set-VMMemory `
-    -VMName $VMName `
-    -DynamicMemoryEnabled $false
-
-# Secure Boot
-Set-VMFirmware `
-    -VMName $VMName `
-    -EnableSecureBoot On `
-    -SecureBootTemplate "MicrosoftWindows"
-
-# Adicionar ISO
-Add-VMDvdDrive `
-    -VMName $VMName `
-    -Path $ISOPath
-
-# Obter DVD
-$DVD = Get-VMDvdDrive `
-    -VMName $VMName
-
-# Definir DVD como primeiro boot
-Set-VMFirmware `
-    -VMName $VMName `
-    -FirstBootDevice $DVD
-
-# Cri
+    volumes:
+      - ./windows:/storage
