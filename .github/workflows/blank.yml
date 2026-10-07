@@ -1,27 +1,66 @@
-services:
-  windows:
-    image: dockurr/windows:latest
-    container_name: pc-virtual
-    restart: unless-stopped
+name: Virtual PC Online
 
-    environment:
-      VERSION: "11"
-      RAM_SIZE: "16G"
-      CPU_CORES: "4"
-      DISK_SIZE: "100G"
-      USERNAME: "PC"
-      PASSWORD: "TroqueEstaSenha123!"
+on:
+  workflow_dispatch:
+    inputs:
+      access_password:
+        description: "Defina uma senha para o usuário"
+        required: true
+        type: string
 
-    devices:
-      - /dev/kvm
-      - /dev/net/tun
+jobs:
+  virtual-pc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
 
-    cap_add:
-      - NET_ADMIN
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    ports:
-      - "8006:8006"
-      - "3389:3389"
+      - name: Configurar senha do usuário
+        run: |
+          echo "runner:${{ inputs.access_password }}" | sudo chpasswd
+          sudo usermod -aG sudo runner
 
-    volumes:
-      - ./windows:/storage
+      - name: Instalar servidor de área de trabalho e VNC
+        run: |
+          sudo apt update
+          sudo apt install -y xfce4 xfce4-goodies tightvncserver wget curl
+
+      - name: Configurar VNC
+        run: |
+          mkdir -p ~/.vnc
+
+          cat > ~/.vnc/xstartup <<'EOF'
+          #!/bin/sh
+          xrdb $HOME/.Xresources
+          startxfce4 &
+          EOF
+
+          chmod +x ~/.vnc/xstartup
+
+          echo "${{ inputs.access_password }}" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+
+      - name: Iniciar servidor VNC
+        run: |
+          vncserver :1 -geometry 1280x720 -depth 24
+          echo "Servidor VNC iniciado na porta 5901"
+
+      - name: Instalar Ngrok
+        uses: ngrok/ngrok-action@v1
+        with:
+          auth-token: ${{ secrets.NGROK_AUTHTOKEN }}
+
+      - name: Criar túnel VNC via Ngrok
+        run: |
+          ngrok tcp 5901 --log=stdout &
+
+          sleep 10
+
+          echo "===================================="
+          echo "PC Virtual iniciado!"
+          echo "Use um cliente VNC para conectar."
+          echo "===================================="
+
+          sleep infinity
